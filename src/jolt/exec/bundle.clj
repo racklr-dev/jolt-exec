@@ -35,23 +35,26 @@
 
 (defn bundle-daemon!
   "Copy the daemon binary and its extra (non-glibc) shared libraries into a
-  guest rootfs, executable at guest-path (default /jolt-exec-daemon). Returns
-  the guest path. The lib list comes from `ldd`; each is resolved against the
-  host's standard library dirs and copied as its soname into the rootfs's
-  /usr/lib/x86_64-linux-gnu."
-  [daemon-binary rootfs & {:keys [guest-path] :or {guest-path "/jolt-exec-daemon"}}]
+  guest rootfs, executable at guest-path (default /jolt-exec-daemon). The lib
+  list is the union of the binary's ldd-resolved needs and any :shared-libs
+  passed in (typically the reconciled :jolt/guest-deps declaration). Returns
+  the guest path."
+  [daemon-binary rootfs & {:keys [guest-path shared-libs] :or {guest-path "/jolt-exec-daemon" shared-libs []}}]
   (let [libdir (str rootfs "/usr/lib/x86_64-linux-gnu")
         _ (.mkdirs (File. libdir))
         _ (copy-file! daemon-binary (str rootfs guest-path))
-        ldd-out (:out (shell/sh "ldd" daemon-binary))]
-    (doseq [line (str/split-lines ldd-out)]
-      (when-let [[_ name] (re-find #"\s*(\S+)" line)]
-        (when-not (glibc-lib? name)
-          (when-let [src (resolve-lib name)]
-            (try
-              (let [real (.getCanonicalPath (File. src))]
-                (copy-file! real (str libdir "/" name)))
-              (catch Exception _ nil))))))
+        ldd-out (:out (shell/sh "ldd" daemon-binary))
+        ldd-libs (for [line (str/split-lines ldd-out)
+                       :let [[_ name] (re-find #"\s*(\S+)" line)]
+                       :when (and name (not (glibc-lib? name)))]
+                   name)
+        needed (distinct (concat ldd-libs shared-libs))]
+    (doseq [name needed]
+      (when-let [src (resolve-lib name)]
+        (try
+          (let [real (.getCanonicalPath (File. src))]
+            (copy-file! real (str libdir "/" name)))
+          (catch Exception _ nil))))
     (java.nio.file.Files/setPosixFilePermissions
      (java.nio.file.Paths/get (str rootfs guest-path) (into-array String []))
      (java.nio.file.attribute.PosixFilePermissions/fromString "rwxr-xr-x"))
