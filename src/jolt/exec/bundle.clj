@@ -45,7 +45,7 @@
         _ (copy-file! daemon-binary (str rootfs guest-path))
         ldd-out (:out (shell/sh "ldd" daemon-binary))]
     (doseq [line (str/split-lines ldd-out)]
-      (when-let [[_ name] (re-matches #"\s*(\S+)" line)]
+      (when-let [[_ name] (re-find #"\s*(\S+)" line)]
         (when-not (glibc-lib? name)
           (when-let [src (resolve-lib name)]
             (try
