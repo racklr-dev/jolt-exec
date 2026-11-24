@@ -1,0 +1,19 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jolt
+        run: curl -sL https://raw.githubusercontent.com/jolt-lang/jolt/main/install | bash
+      - name: Build daemon and run client round-trip
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          jolt build -m jolt.exec.daemon -o exec-daemon
+          ./exec-daemon 8787 &
+          DAEMON_PID=$!
+          sleep 2
+          jolt run test/client_test.clj
+          jolt run test/latency_test.clj
+          kill $DAEMON_PID

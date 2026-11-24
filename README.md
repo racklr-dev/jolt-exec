@@ -55,8 +55,8 @@ and connections run concurrently in one VM.
 
 ## Status
 
-beta — the client/daemon round-trip is tested (`test/jolt/client_test.clj`,
-`test/jolt/latency_test.clj`). It is the substrate for high-throughput
+beta — the client/daemon round-trip is tested (`test/client_test.clj`,
+`test/latency_test.clj`). It is the base for high-throughput
 sandboxed exec and for a broker fan-out, which are not yet implemented here.
 
 ## License
